@@ -7,7 +7,7 @@ use std::fmt::Debug;
 use std::mem;
 use std::num::NonZeroU64;
 use std::sync::Arc;
-use wgpu::{Backends, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, BlendState, Buffer, BufferAddress, BufferBinding, BufferBindingType, BufferUsages, Color, ColorTargetState, ColorWrites, CompositeAlphaMode, Device, DeviceDescriptor, Features, FragmentState, include_wgsl, InstanceDescriptor, InstanceFlags, Label, Limits, LoadOp, Operations, PipelineLayoutDescriptor, PowerPreference, PrimitiveState, PrimitiveTopology, Queue, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions, ShaderModule, ShaderModuleDescriptor, ShaderSource, ShaderStages, StoreOp, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState};
+use wgpu::{Adapter, Backends, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, BlendState, Buffer, BufferAddress, BufferBinding, BufferBindingType, BufferUsages, Color, ColorTargetState, ColorWrites, CompositeAlphaMode, Device, DeviceDescriptor, Features, FragmentState, include_wgsl, Instance, InstanceDescriptor, InstanceFlags, Label, Limits, LoadOp, Operations, PipelineLayoutDescriptor, PowerPreference, PrimitiveState, PrimitiveTopology, Queue, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions, ShaderModule, ShaderModuleDescriptor, ShaderSource, ShaderStages, StoreOp, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState};
 use wgpu::LoadOp::Load;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use winit::dpi::{LogicalSize, PhysicalSize};
@@ -43,7 +43,6 @@ impl State {
             ..Default::default()
         });
 
-        let surface = instance.create_surface(window.clone()).unwrap();
 
         let adapter = instance.request_adapter(&RequestAdapterOptions {
             power_preference: PowerPreference::None,
@@ -60,84 +59,16 @@ impl State {
             None,
         ).await.unwrap();
 
-        let surface_capabilities = surface.get_capabilities(&adapter);
-        let surface_format = surface_capabilities
-            .formats
-            .iter()
-            .copied()
-            .filter(|f| f.is_srgb())
-            .next()
-            .unwrap_or(surface_capabilities.formats[0]);
-
-        let window_size = window.inner_size();
-        let surface_config = SurfaceConfiguration {
-            usage: TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width: window_size.width,
-            height: window_size.height,
-            present_mode: wgpu::PresentMode::Immediate,
-            desired_maximum_frame_latency: 2,
-            alpha_mode: Default::default(),
-            view_formats: vec![],
-        };
-
-        surface.configure(&device, &surface_config);
-
-        let camera = Camera {
-            // position the camera 1 unit up and 2 units back
-            // +z is out of the screen
-            eye: (0.0, 0.0, -3.0).into(),
-            // have it look at the origin
-            target: (0.0, 0.0, 0.0).into(),
-            // which way is "up"
-            up: cgmath::Vector3::unit_y(),
-            aspect: surface_config.width as f32 / surface_config.height as f32,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 100.0,
-        };
-
-        let mut camera_uniform = CameraUniform::new(&camera);
-        camera_uniform.update_view_proj(&camera);
-
-        let camera_buffer = device.create_buffer_init(
-            &BufferInitDescriptor {
-                label: Some("Camera Buffer"),
-                contents: bytemuck::cast_slice(&[camera_uniform]),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            }
-        );
-        let camera_bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("camera_bind_group_layout"),
-            entries: &[
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::VERTEX,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: Some(NonZeroU64::new(64).unwrap()),
-                    },
-                    count: None,
-                }
-            ],
-        });
-        let camera_bind_group = device.create_bind_group(
-            &BindGroupDescriptor {
-                label: Some("camera_bind_group"),
-                layout: &camera_bind_group_layout,
-                entries: &[
-                    BindGroupEntry {
-                        binding: 0,
-                        resource: camera_buffer.as_entire_binding(),
-                    }
-                ],
-            });
+        let (surface, surface_config) = setup_surface(&instance, window.clone(), &adapter, &device);
 
         let (instances, instance_buffer) =
             drawing::initialize_circle_and_vertex_bufs(&device);
 
-
+        let (camera,
+            camera_uniform,
+            camera_bind_group,
+            camera_bind_group_layout,
+            camera_buffer) = camera::setup_camera(&surface, &device, &surface_config);
 
         let pipeline_layout = device.create_pipeline_layout(
             &PipelineLayoutDescriptor {
@@ -164,11 +95,11 @@ impl State {
                 primitive: Default::default(),
                 depth_stencil: None,
                 multisample: Default::default(),
-                fragment: Some(FragmentState{
+                fragment: Some(FragmentState {
                     module: &shader,
                     entry_point: "fs_main",
                     targets: &[
-                        Some(ColorTargetState{
+                        Some(ColorTargetState {
                             format: surface_config.format,
                             blend: Some(BlendState::ALPHA_BLENDING),
                             write_mask: ColorWrites::ALL,
@@ -212,7 +143,7 @@ impl State {
         // println!("{:?}", physical_size);
     }
 
-    pub fn update(&mut self){
+    pub fn update(&mut self) {
         self.camera_uniform.update_view_proj(&self.camera);
         self.queue.write_buffer(
             &self.camera_buffer,
@@ -221,9 +152,9 @@ impl State {
         );
     }
 
-    pub fn update_circles(&mut self, new_circles: Vec<Circle>){
+    pub fn update_circles(&mut self, new_circles: Vec<Circle>) {
         self.instances = new_circles.clone();
-        self.instance_buffer = self.device.create_buffer_init(&BufferInitDescriptor{
+        self.instance_buffer = self.device.create_buffer_init(&BufferInitDescriptor {
             label: Some("Circle Buffer"),
             contents: bytemuck::cast_slice(new_circles.as_slice()),
             usage: BufferUsages::VERTEX,
@@ -267,4 +198,32 @@ impl State {
         frame.present();
         return;
     }
+}
+
+pub fn setup_surface(instance: &Instance, window: Arc<Window>, adapter: &Adapter, device: &Device) -> (Surface<'static>, SurfaceConfiguration) {
+    let surface = instance.create_surface(window.clone()).unwrap();
+
+    let surface_capabilities = surface.get_capabilities(&adapter);
+    let surface_format = surface_capabilities
+        .formats
+        .iter()
+        .copied()
+        .filter(|f| f.is_srgb())
+        .next()
+        .unwrap_or(surface_capabilities.formats[0]);
+
+    let window_size = window.inner_size();
+    let surface_config = SurfaceConfiguration {
+        usage: TextureUsages::RENDER_ATTACHMENT,
+        format: surface_format,
+        width: window_size.width,
+        height: window_size.height,
+        present_mode: wgpu::PresentMode::Immediate,
+        desired_maximum_frame_latency: 2,
+        alpha_mode: Default::default(),
+        view_formats: vec![],
+    };
+
+    surface.configure(&device, &surface_config);
+    (surface, surface_config)
 }

@@ -8,26 +8,29 @@ pub struct Body {
     pub mass: f32,
     pub speed: Vector2<f32>,
     pub acceleration: Vector2<f32>,
+    pub density: f32,
 }
 
 const G: f32 = 50.0;
 
 impl Body {
-    pub fn new(position: Vector2<f32>, mass: f32) -> Self {
+    pub fn new(position: Vector2<f32>, mass: f32, density: f32) -> Self {
         Body {
             position,
             mass,
             speed: Vector2 { x: 0.0, y: 0.0 },
             acceleration: Vector2 { x: 0.0, y: 0.0 },
+            density,
         }
     }
 
-    pub fn new_sp(position: Vector2<f32>, mass: f32, speed: Vector2<f32>) -> Self {
+    pub fn new_sp(position: Vector2<f32>, mass: f32, speed: Vector2<f32>, density: f32) -> Self {
         Body {
             position,
             mass,
             speed,
             acceleration: Vector2 { x: 0.0, y: 0.0 },
+            density,
         }
     }
 
@@ -45,7 +48,7 @@ impl Body {
     pub fn to_circle(&self) -> Circle {
         Circle {
             world_pos: [self.position.x, self.position.y, 0.0],
-            radius: self.mass,
+            radius: self.mass / self.density,
             color: 0xFFFFFFFF,
         }
     }

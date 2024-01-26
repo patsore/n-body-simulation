@@ -1,20 +1,27 @@
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
-use image::GenericImageView;
 use winit::event::{Event, KeyEvent, WindowEvent};
-use winit::event_loop::ControlFlow;
 use winit::keyboard::{Key, NamedKey};
 use wgpu_test::State;
 use wgpu_test::Simulation;
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
     let event_loop = winit::event_loop::EventLoopBuilder::new().build().unwrap();
     let window = winit::window::WindowBuilder::default().build(&event_loop).unwrap();
     let out_window_id = window.id();
-    let mut state =  Arc::new(Mutex::new(State::new(Arc::new(window)).await));
+    let mut state = Arc::new(Mutex::new(State::new(Arc::new(window)).await));
 
-    let mut simulation = Simulation::new(state.clone());
+    let mut simulation = Simulation::new(5000, 0.05);
+
+    let state_thread = state.clone();
+    tokio::spawn(async move {
+        let state = state_thread;
+        loop {
+            simulation.update();
+            state.lock().unwrap().update_circles(simulation.get_bodies_as_circles());
+        }
+    });
 
     event_loop.run(|event, elfw| {
         match event {
@@ -39,7 +46,6 @@ async fn main() {
                     WindowEvent::ScaleFactorChanged { .. } => {}
                     WindowEvent::RedrawRequested => {
                         state.lock().unwrap().window.request_redraw();
-                        simulation.update();
                     }
                     _ => {}
                 }

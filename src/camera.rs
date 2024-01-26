@@ -1,4 +1,7 @@
 use std::fmt::Debug;
+use std::num::NonZeroU64;
+use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, Device, ShaderStages, Surface, SurfaceConfiguration};
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
@@ -23,7 +26,7 @@ impl Camera {
         let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
 
-        let projection_matrix = OPENGL_TO_WGPU_MATRIX  * proj * view;
+        let projection_matrix = OPENGL_TO_WGPU_MATRIX * proj * view;
 
         return projection_matrix;
     }
@@ -45,5 +48,64 @@ impl CameraUniform {
     pub fn update_view_proj(&mut self, camera: &Camera) {
         self.view_proj = camera.build_view_projection_matrix().into();
     }
+}
+
+pub fn setup_camera(surface: &Surface, device: &Device, surface_config: &SurfaceConfiguration) -> (Camera, CameraUniform, BindGroup, BindGroupLayout, Buffer) {
+    let camera = Camera {
+        // position the camera 1 unit up and 2 units back
+        // +z is out of the screen
+        eye: (0.0, 0.0, -25.0).into(),
+        // have it look at the origin
+        target: (0.0, 0.0, 0.0).into(),
+        // which way is "up"
+        up: cgmath::Vector3::unit_y(),
+        aspect: surface_config.width as f32 / surface_config.height as f32,
+        fovy: 45.0,
+        znear: 0.1,
+        zfar: 100.0,
+    };
+
+    let mut camera_uniform = CameraUniform::new(&camera);
+    camera_uniform.update_view_proj(&camera);
+
+    let camera_buffer = device.create_buffer_init(
+        &BufferInitDescriptor {
+            label: Some("Camera Buffer"),
+            contents: bytemuck::cast_slice(&[camera_uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        }
+    );
+    let camera_bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+        label: Some("camera_bind_group_layout"),
+        entries: &[
+            BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStages::VERTEX,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: Some(NonZeroU64::new(64).unwrap()),
+                },
+                count: None,
+            }
+        ],
+    });
+    let camera_bind_group = device.create_bind_group(
+        &BindGroupDescriptor {
+            label: Some("camera_bind_group"),
+            layout: &camera_bind_group_layout,
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: camera_buffer.as_entire_binding(),
+                }
+            ],
+        });
+
+    (camera,
+     camera_uniform,
+     camera_bind_group,
+        camera_bind_group_layout,
+     camera_buffer)
 }
 

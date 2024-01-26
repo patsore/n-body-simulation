@@ -2234,6 +2234,7 @@ dependencies = [
  "image",
  "log",
  "rand",
+ "rayon",
  "tokio",
  "wgpu",
  "winit",
