@@ -1,13 +1,13 @@
-use std::arch::x86_64;
-use std::sync::{Arc, Mutex};
-use cgmath::{InnerSpace, Vector2};
+
+
+use cgmath::{MetricSpace, Vector2, Zero};
 use crate::nbody_sim::Body;
-use crate::State;
-use std::borrow::BorrowMut;
-use rand::Rng;
-use std::f32::consts::TAU;
-use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator};
-use rayon::iter::ParallelIterator;
+
+
+
+
+
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use crate::drawing::Circle;
 
 pub struct Simulation {
@@ -17,7 +17,7 @@ const T: f32 = 0.001;
 
 impl Simulation {
     pub fn new(num_bodies: usize, spacing: f32) -> Self {
-        let mut bodies = create_spiral_cluster(num_bodies, spacing);
+        let bodies = create_spiral_cluster(num_bodies, spacing);
 
         Simulation {
             bodies,
@@ -32,16 +32,30 @@ impl Simulation {
     pub fn update(&mut self) {
         let bodies_len = self.bodies.len();
 
+        let precomputed_a = (0..bodies_len - 1).into_par_iter().map(|i_from| {
+            let i_from_position = self.bodies[i_from].position;
+            let i_from_mass = self.bodies[i_from].mass;
+            (i_from + 1..bodies_len).into_par_iter().map(|i_to| {
+                let i_to_position = self.bodies[i_to].position;
+                let i_to_mass = self.bodies[i_to].mass;
+                let distance = i_from_position.distance2(i_to_position);
+                // println!("distance: {distance} {dx} {dy}");
+                let body_to_vec = i_from_position - i_to_position;
+                if distance.floor() == 1.0 {
+                    return Vector2::<f32>::zero();
+                };
+
+                let a = (crate::nbody_sim::body::G * i_from_mass * i_to_mass) / distance;
+                return a * body_to_vec;
+            }).collect::<Vec<Vector2<f32>>>()
+        }).collect::<Vec<_>>();
 
         for body_from_i in 0..bodies_len - 1 {
+            let precomputed_a_vec = &precomputed_a[body_from_i];
             for body_other in body_from_i + 1..bodies_len {
-                let body_to_vec = self.bodies[body_from_i].position - self.bodies[body_other].position;
-                // println!("pos0: {:?}, pos1: {:?}", self.bodies[0].position, self.bodies[1].position);
-                let a = self.bodies[body_from_i].compute_acceleration_to_other_body(&self.bodies[body_other]);
-                // println!("a: {a}");
-                self.bodies[body_from_i].acceleration += body_to_vec * -1.0 * a;
-                self.bodies[body_other].acceleration += body_to_vec * a;
-
+                let a_vec = precomputed_a_vec[body_other - body_from_i - 1];
+                self.bodies[body_from_i].acceleration += a_vec * -1.0;
+                self.bodies[body_other].acceleration += a_vec;
             }
         }
 

@@ -3,14 +3,14 @@ mod drawing;
 mod nbody_sim;
 
 pub use nbody_sim::*;
-use std::fmt::Debug;
-use std::mem;
-use std::num::NonZeroU64;
+
+
+
 use std::sync::Arc;
-use wgpu::{Adapter, Backends, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, BlendState, Buffer, BufferAddress, BufferBinding, BufferBindingType, BufferUsages, Color, ColorTargetState, ColorWrites, CompositeAlphaMode, Device, DeviceDescriptor, Features, FragmentState, include_wgsl, Instance, InstanceDescriptor, InstanceFlags, Label, Limits, LoadOp, Operations, PipelineLayoutDescriptor, PowerPreference, PrimitiveState, PrimitiveTopology, Queue, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions, ShaderModule, ShaderModuleDescriptor, ShaderSource, ShaderStages, StoreOp, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState};
-use wgpu::LoadOp::Load;
+use wgpu::{Adapter, Backends, BindGroup, BlendState, Buffer, BufferUsages, Color, ColorTargetState, ColorWrites, Device, DeviceDescriptor, Features, FragmentState, include_wgsl, Instance, InstanceDescriptor, InstanceFlags, LoadOp, Operations, PipelineLayoutDescriptor, PowerPreference, Queue, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions, StoreOp, Surface, SurfaceConfiguration, TextureUsages, VertexState};
+
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
-use winit::dpi::{LogicalSize, PhysicalSize};
+use winit::dpi::{PhysicalSize};
 use winit::window::Window;
 use camera::Camera;
 use crate::camera::CameraUniform;

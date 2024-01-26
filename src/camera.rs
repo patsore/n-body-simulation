@@ -50,7 +50,7 @@ impl CameraUniform {
     }
 }
 
-pub fn setup_camera(surface: &Surface, device: &Device, surface_config: &SurfaceConfiguration) -> (Camera, CameraUniform, BindGroup, BindGroupLayout, Buffer) {
+pub fn setup_camera(_surface: &Surface, device: &Device, surface_config: &SurfaceConfiguration) -> (Camera, CameraUniform, BindGroup, BindGroupLayout, Buffer) {
     let camera = Camera {
         // position the camera 1 unit up and 2 units back
         // +z is out of the screen

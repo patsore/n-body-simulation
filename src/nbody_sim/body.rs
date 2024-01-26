@@ -1,5 +1,5 @@
-use std::ops::{Add, Sub};
-use cgmath::{MetricSpace, Vector2, Vector3};
+
+use cgmath::{MetricSpace, Vector2};
 use crate::drawing::Circle;
 
 #[derive(Copy, Clone)]
@@ -11,7 +11,7 @@ pub struct Body {
     pub density: f32,
 }
 
-const G: f32 = 50.0;
+pub(crate) const G: f32 = 50.0;
 
 impl Body {
     pub fn new(position: Vector2<f32>, mass: f32, density: f32) -> Self {
@@ -55,12 +55,7 @@ impl Body {
 
     pub fn compute_acceleration_to_other_body(&self, other: &Body) -> f32 {
         // println!("{:?}, {:?}", self.position.x, other.position.x);
-        let dx = other.position.x - self.position.x;
-
-        let dy = other.position.y - self.position.y;
-
-        let distance = dx * dx + dy * dy;
-
+        let distance = self.position.distance2(other.position);
         // println!("distance: {distance} {dx} {dy}");
         if distance.floor() == 1.0 {
             return 0.0;
@@ -69,3 +64,4 @@ impl Body {
         return a;
     }
 }
+

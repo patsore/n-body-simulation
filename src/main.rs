@@ -10,9 +10,9 @@ async fn main() {
     let event_loop = winit::event_loop::EventLoopBuilder::new().build().unwrap();
     let window = winit::window::WindowBuilder::default().build(&event_loop).unwrap();
     let out_window_id = window.id();
-    let mut state = Arc::new(Mutex::new(State::new(Arc::new(window)).await));
+    let state = Arc::new(Mutex::new(State::new(Arc::new(window)).await));
 
-    let mut simulation = Simulation::new(5000, 0.05);
+    let mut simulation = Simulation::new(2000, 0.05);
 
     let state_thread = state.clone();
     tokio::spawn(async move {
